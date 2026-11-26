@@ -1,17 +1,27 @@
 {
   "expo": {
-    "name": "mycloset",
+    "name": "MyCloset",
     "slug": "mycloset",
     "version": "1.0.0",
+    "scheme": "mycloset",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "experiments": {
+      "typedRoutes": false
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mycloset.app",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Allow MyCloset to access your photos so you can add clothing items.",
+        "NSCameraUsageDescription": "Allow MyCloset to use your camera to photograph your clothing."
+      }
     },
     "android": {
+      "package": "com.mycloset.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FAF8F5",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -19,7 +29,25 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "root": "src/app"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow MyCloset to access your photos so you can add clothing items.",
+          "cameraPermission": "Allow MyCloset to use your camera to photograph your clothing.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-font"
+    ]
   }
 }
