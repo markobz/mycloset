@@ -1,33 +1,59 @@
-import { Stack } from 'expo-router';
+import { ReactNode, useEffect } from 'react';
+import { Platform } from 'react-native';
+import { Stack, usePathname, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ClosetProvider } from '../context/ClosetContext';
 import { theme } from '../theme';
+import { ClosetStoreProvider, useCloset } from '../store/ClosetStore';
+
+function NameGate({ children }: { children: ReactNode }) {
+  const { name, ready } = useCloset();
+  const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (ready && name === '' && pathname !== '/welcome') {
+      router.replace('/welcome');
+    }
+  }, [ready, name, pathname, router]);
+
+  return <>{children}</>;
+}
 
 export default function RootLayout() {
   return (
-    <ClosetProvider>
-      <StatusBar style="dark" />
-      <Stack
-        screenOptions={{
-          headerShadowVisible: false,
-          headerStyle: { backgroundColor: theme.background },
-          headerTitleStyle: { fontWeight: '600', color: theme.text },
-          headerTintColor: theme.text,
-          contentStyle: { backgroundColor: theme.background },
-        }}
-      >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="add-item"
-          options={{ presentation: 'modal', title: 'Add Item' }}
-        />
-        <Stack.Screen
-          name="create-outfit"
-          options={{ presentation: 'modal', title: 'New Outfit' }}
-        />
-        <Stack.Screen name="item/[id]" options={{ title: 'Item' }} />
-        <Stack.Screen name="outfit/[id]" options={{ title: 'Outfit' }} />
-      </Stack>
-    </ClosetProvider>
+    <ClosetStoreProvider>
+      <NameGate>
+        <StatusBar style="dark" />
+        <Stack
+          screenOptions={{
+            headerStyle: { backgroundColor: theme.background },
+            headerTintColor: theme.ink,
+            headerTitleStyle: {
+              fontFamily: theme.serif,
+              fontWeight: Platform.select({ ios: '600', default: '500' }),
+            },
+            headerShadowVisible: false,
+            headerBackTitle: 'Back',
+          }}
+        >
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="welcome" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="add-item"
+            options={{ title: 'Add a piece', presentation: 'modal' }}
+          />
+          <Stack.Screen name="item/[id]" options={{ title: 'Piece' }} />
+          <Stack.Screen
+            name="categories"
+            options={{ title: 'Categories', presentation: 'modal' }}
+          />
+          <Stack.Screen
+            name="create-outfit"
+            options={{ title: 'New outfit', presentation: 'modal' }}
+          />
+          <Stack.Screen name="outfit/[id]" options={{ title: 'Outfit' }} />
+        </Stack>
+      </NameGate>
+    </ClosetStoreProvider>
   );
 }

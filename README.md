@@ -1,16 +1,19 @@
-# MyCloset
+# mycloset
 
-An e-closet app for iOS and Android built with [Expo](https://expo.dev) (React Native + Expo Router, TypeScript).
+Your wardrobe. Your style. Your seasons.
 
-Photograph your clothes, organize them by category, and combine them into outfits — your whole wardrobe in your pocket.
+A completely free digital e-closet for iOS and Android, built with [Expo](https://expo.dev) (React Native + Expo Router, TypeScript). No accounts, no ads, no subscriptions — everything stays on your device.
 
 ## Features
 
-- **Closet** — photo grid of every item; filter by category (Tops, Bottoms, Dresses, Outerwear, Shoes, Accessories)
-- **Add items** — take a photo with the camera or pick one from the photo library; name it, tag the category and color
-- **Favorites** — heart the pieces you love
-- **Outfits** — combine closet items into named outfits with an optional occasion, and see which outfits use each item
-- **Offline-first** — items and outfits persist on-device (AsyncStorage); photos are copied into the app's documents folder so they survive restarts
+- **Wardrobe** — a photo grid of every piece, with search, season filters, favourites and fully customisable categories (create, rename, delete, reorder, optional subcategories)
+- **Adding pieces** — photograph an item with the camera or import from your photo library; photos are automatically resized and optimised for a clean, studio-like look; each item stores name, custom category, colour, seasons, brand and notes
+- **Style** — an on-device personal stylist. Tap **Create outfits for me** and it combines only the pieces you already own into complete looks (with shoes, bags, jewellery and outerwear), scoring colour harmony, season fit and your saved preferences. Tap any piece in a suggestion to swap it for something similar
+- **Preferences** — favourite colours, styles and seasons, casual vs elegant, everyday vs special occasion
+- **My Outfits** — a gallery of saved looks with season filters, favourites, notes, "mark as worn" history, and a manual outfit builder
+- **Settings** — change your name, edit preferences, export/restore a full JSON backup of your closet, and about
+- **Private & offline** — all data lives on-device (AsyncStorage + app documents folder); the stylist runs entirely offline with no network calls or API keys
+- **First launch** — a quiet welcome asks your name, then greets you by name
 
 ## Run locally
 
@@ -21,37 +24,18 @@ npx expo start
 
 Then press `i` for the iOS simulator or `a` for the Android emulator, or scan the QR code with the Expo Go app on a physical device.
 
-> `expo-image-picker` and `expo-file-system` are bundled with Expo Go, so you can try everything without a custom build.
-
 ## Build for iOS and Android
 
 Install [EAS CLI](https://docs.expo.dev/build/introduction.md) (requires a free Expo account):
 
 ```bash
-npx eas-cli@latest build --profile development --platform all   # dev builds
-npx eas-cli@latest build --profile production --platform all    # store builds
+npm install -g eas-cli
+eas login
+eas build --platform all
 ```
 
-## Project layout
+## Notes
 
-```
-src/
-  app/            # Expo Router screens
-    (tabs)/       # Closet + Outfits tab screens
-    add-item.tsx  # Add item modal (camera / photo library)
-    create-outfit.tsx
-    item/[id].tsx
-    outfit/[id].tsx
-  context/        # Closet data layer + AsyncStorage persistence
-  theme/          # Shared colors and typography
-  utils/          # id generation, image persistence
-```
-
-## Scripts
-
-| Command | Description |
-| --- | --- |
-| `npm start` | Start the Expo dev server |
-| `npm run ios` / `npm run android` | Start on a platform |
-| `npm run typecheck` | TypeScript check |
-| `npm run lint` | Expo lint |
+- OTA updates are published via `eas update` (Expo Updates); the app checks for new versions on launch
+- The AI stylist is a rule-based engine in pure TypeScript (colour harmony, season logic, role detection from your categories) — genuinely free, offline and private
+- Background removal uses Expo's image pipeline (crop + optimise); true transparent cutouts would require a custom native build with Apple's Vision framework

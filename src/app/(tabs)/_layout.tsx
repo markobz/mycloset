@@ -6,31 +6,53 @@ export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShadowVisible: false,
-        headerTitleStyle: { fontWeight: '600', color: theme.text },
-        headerStyle: { backgroundColor: theme.background },
-        tabBarActiveTintColor: theme.text,
+        headerShown: false,
+        tabBarActiveTintColor: theme.gold,
         tabBarInactiveTintColor: theme.muted,
-        tabBarStyle: { backgroundColor: theme.background },
+        tabBarStyle: {
+          backgroundColor: theme.background,
+          borderTopColor: theme.border,
+          borderTopWidth: 1,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          letterSpacing: 0.3,
+        },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'My Closet',
-          tabBarLabel: 'Closet',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="shirt-outline" size={size} color={String(color)} />
+          title: 'Wardrobe',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'shirt' : 'shirt-outline'} size={22} color={String(color)} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="style"
+        options={{
+          title: 'Style',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'sparkles' : 'sparkles-outline'} size={22} color={String(color)} />
           ),
         }}
       />
       <Tabs.Screen
         name="outfits"
         options={{
-          title: 'Outfits',
-          tabBarLabel: 'Outfits',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="albums-outline" size={size} color={String(color)} />
+          title: 'My Outfits',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'albums' : 'albums-outline'} size={22} color={String(color)} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Settings',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'settings' : 'settings-outline'} size={22} color={String(color)} />
           ),
         }}
       />

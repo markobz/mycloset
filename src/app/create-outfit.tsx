@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import {
-  Alert,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -8,203 +7,202 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
-import { router } from 'expo-router';
-import { useCloset } from '../context/ClosetContext';
+import { useLocalSearchParams, router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { Chip, Field, Input, PrimaryButton, SeasonChips } from '../components/ui';
 import { theme, typography } from '../theme';
+import { useCloset } from '../store/ClosetStore';
+import { Season } from '../types';
 
 export default function CreateOutfitScreen() {
-  const { items, addOutfit } = useCloset();
+  const params = useLocalSearchParams<{ fromDraft?: string }>();
+  const { items, categories, addOutfit } = useCloset();
   const [name, setName] = useState('');
-  const [occasion, setOccasion] = useState('');
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<string[]>(() =>
+    params.fromDraft ? params.fromDraft.split(',').filter(Boolean) : [],
+  );
+  const [seasons, setSeasons] = useState<Season[]>([]);
+  const [occasion, setOccasion] = useState<string | null>(null);
+  const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const toggle = (id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
+  const topLevel = useMemo(
+    () => categories.filter((category) => category.parentId === null),
+    [categories],
+  );
+  const itemsByCategory = useMemo(() => {
+    const map = new Map<string, typeof items>();
+    for (const item of items) {
+      const key = item.categoryId ?? 'none';
+      const list = map.get(key) ?? [];
+      list.push(item);
+      map.set(key, list);
+    }
+    return map;
+  }, [items]);
 
-  const canSave = useMemo(() => selected.size > 0, [selected]);
+  const toggle = (id: string) =>
+    setSelected((previous) =>
+      previous.includes(id) ? previous.filter((entry) => entry !== id) : [...previous, id],
+    );
 
   const save = async () => {
-    if (!canSave) {
-      Alert.alert('Pick items', 'Select at least one piece for this outfit.');
-      return;
-    }
+    if (selected.length === 0) return;
     setSaving(true);
     try {
       await addOutfit({
         name,
-        occasion: occasion.trim(),
-        itemIds: items
-          .filter((item) => selected.has(item.id))
-          .map((item) => item.id),
+        itemIds: selected,
+        seasons,
+        occasion: occasion ?? undefined,
+        notes: notes.trim() || undefined,
       });
       router.back();
-    } catch {
-      Alert.alert('Could not save', 'Something went wrong. Please try again.');
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <View style={styles.form}>
-        <TextInput
-          style={styles.input}
-          value={name}
-          onChangeText={setName}
-          placeholder="Outfit name (e.g. Friday dinner)"
-          placeholderTextColor={theme.muted}
-        />
-        <TextInput
-          style={styles.input}
-          value={occasion}
-          onChangeText={setOccasion}
-          placeholder="Occasion (optional)"
-          placeholderTextColor={theme.muted}
-        />
-      </View>
-
-      {items.length === 0 ? (
-        <View style={styles.empty}>
-          <Text style={styles.emptyText}>
-            Add items to your closet first, then come back to build outfits.
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={items}
-          keyExtractor={(item) => item.id}
-          numColumns={3}
-          columnWrapperStyle={styles.row}
-          contentContainerStyle={styles.grid}
-          renderItem={({ item }) => {
-            const isSelected = selected.has(item.id);
-            return (
-              <Pressable
-                style={styles.cell}
-                onPress={() => toggle(item.id)}
-              >
-                <Image source={{ uri: item.uri }} style={styles.image} />
-                {isSelected && (
-                  <View style={styles.check}>
-                    <Text style={styles.checkText}>✓</Text>
-                  </View>
-                )}
-              </Pressable>
-            );
-          }}
-        />
-      )}
-
-      <Pressable
-        style={[styles.saveButton, (!canSave || saving) && styles.saveButtonDisabled]}
-        onPress={save}
-        disabled={!canSave || saving}
-      >
-        <Text style={styles.saveButtonText}>
-          {saving
-            ? 'Saving…'
-            : canSave
-              ? `Save outfit (${selected.size} item${selected.size === 1 ? '' : 's'})`
-              : 'Select items to save'}
-        </Text>
-      </Pressable>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.fill}>
+      <FlatList
+        data={topLevel.filter((category) => (itemsByCategory.get(category.id) ?? []).length > 0)}
+        keyExtractor={(category) => category.id}
+        contentContainerStyle={{ padding: theme.spacing, paddingBottom: 40 }}
+        keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={
+          <View>
+            <Field label="Outfit name">
+              <Input value={name} onChangeText={setName} placeholder="e.g. Saturday brunch" />
+            </Field>
+            <Field label="Seasons">
+              <SeasonChips
+                selected={seasons}
+                onToggle={(value) =>
+                  setSeasons((previous) =>
+                    previous.includes(value)
+                      ? previous.filter((entry) => entry !== value)
+                      : [...previous, value],
+                  )
+                }
+              />
+            </Field>
+            <Field label="Occasion (optional)">
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                <Chip label="Everyday" active={occasion === 'Everyday'} onPress={() => setOccasion(occasion === 'Everyday' ? null : 'Everyday')} />
+                <Chip label="Special" active={occasion === 'Special'} onPress={() => setOccasion(occasion === 'Special' ? null : 'Special')} />
+              </View>
+            </Field>
+            <Text style={[typography.muted, { marginBottom: 12 }]}>
+              Tap the pieces that belong to this outfit.
+            </Text>
+          </View>
+        }
+        ListFooterComponent={
+          <View>
+            {items.length === 0 ? (
+              <Text style={[typography.muted, { textAlign: 'center', paddingVertical: 24 }]}>
+                Add pieces to your wardrobe first.
+              </Text>
+            ) : null}
+            <View style={{ marginTop: 16 }}>
+              <PrimaryButton
+                label={selected.length > 0 ? `Save outfit (${selected.length} pieces)` : 'Select pieces first'}
+                disabled={selected.length === 0}
+                busy={saving}
+                onPress={() => void save()}
+              />
+            </View>
+            <Field label="Notes (optional)">
+              <Input value={notes} onChangeText={setNotes} multiline placeholder="Where to wear it, styling ideas…" />
+            </Field>
+          </View>
+        }
+        renderItem={({ item: category }) => {
+          const groupItems = itemsByCategory.get(category.id) ?? [];
+          return (
+            <View style={{ marginBottom: 18 }}>
+              <Text style={[typography.muted, { marginBottom: 8, textTransform: 'uppercase', fontSize: 11, letterSpacing: 0.6 }]}>
+                {category.name}
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                {groupItems.map((item) => {
+                  const isSelected = selected.includes(item.id);
+                  return (
+                    <Pressable
+                      key={item.id}
+                      style={[styles.pickTile, isSelected && styles.pickTileSelected]}
+                      onPress={() => toggle(item.id)}
+                    >
+                      {item.uri ? (
+                        <Image source={{ uri: item.uri }} style={styles.pickImage} resizeMode="cover" />
+                      ) : (
+                        <View style={[styles.pickImage, styles.pickPlaceholder]}>
+                          <Ionicons name="image-outline" size={20} color={theme.beige} />
+                        </View>
+                      )}
+                      {isSelected ? (
+                        <View style={styles.pickCheck}>
+                          <Ionicons name="checkmark" size={13} color="#FFFFFF" />
+                        </View>
+                      ) : null}
+                      <Text style={styles.pickName} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          );
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  fill: {
     flex: 1,
     backgroundColor: theme.background,
   },
-  form: {
-    paddingHorizontal: theme.spacing,
-    paddingTop: theme.spacing,
-    gap: 10,
-  },
-  input: {
+  pickTile: {
+    width: 96,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    borderRadius: 12,
+    overflow: 'hidden',
     backgroundColor: theme.card,
-    borderWidth: 1,
-    borderColor: theme.border,
-    borderRadius: theme.radius,
-    paddingHorizontal: 14,
-    paddingVertical: Platform.OS === 'ios' ? 12 : 10,
-    fontSize: 15,
-    color: theme.text,
+    position: 'relative',
   },
-  grid: {
-    paddingHorizontal: theme.spacing,
-    paddingBottom: 24,
+  pickTileSelected: {
+    borderColor: theme.gold,
   },
-  row: {
-    gap: 10,
-    marginBottom: 10,
-  },
-  cell: {
-    flex: 1,
-  },
-  image: {
+  pickImage: {
     width: '100%',
-    aspectRatio: 1,
-    borderRadius: 10,
-    backgroundColor: theme.chip,
+    height: 110,
+    backgroundColor: theme.cream,
   },
-  check: {
+  pickPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickCheck: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
+    top: 6,
+    right: 6,
+    width: 20,
+    height: 20,
     borderRadius: 10,
-    backgroundColor: 'rgba(28, 27, 26, 0.55)',
-  },
-  checkText: {
-    color: theme.onPrimary,
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  empty: {
-    flex: 1,
+    backgroundColor: theme.gold,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 32,
   },
-  emptyText: {
-    ...typography.body,
-    textAlign: 'center',
-    color: theme.muted,
-  },
-  saveButton: {
-    margin: theme.spacing,
-    backgroundColor: theme.primary,
-    borderRadius: 28,
-    paddingVertical: 15,
-    alignItems: 'center',
-  },
-  saveButtonDisabled: {
-    opacity: 0.6,
-  },
-  saveButtonText: {
-    ...typography.button,
-    color: theme.onPrimary,
+  pickName: {
+    fontSize: 12,
+    color: theme.ink,
+    padding: 6,
   },
 });
