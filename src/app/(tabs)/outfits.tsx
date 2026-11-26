@@ -1,171 +1,162 @@
-import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Link, router } from 'expo-router';
+import { useMemo, useState } from 'react';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useCloset } from '../../context/ClosetContext';
+import { Chip, EmptyState, ItemThumb, PageHeader, Screen } from '../../components/ui';
 import { theme, typography } from '../../theme';
+import { useCloset } from '../../store/ClosetStore';
+import { Outfit, SEASONS, Season } from '../../types';
 
-export default function OutfitsScreen() {
-  const { outfits, items } = useCloset();
+type Filter = 'all' | 'favorites' | Season;
+
+export default function MyOutfitsScreen() {
+  const { outfits, items, updateOutfit } = useCloset();
+  const [filter, setFilter] = useState<Filter>('all');
+
+  const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
+
+  const filtered = useMemo(() => {
+    return outfits.filter((outfit) => {
+      if (filter === 'favorites' && !outfit.favorite) return false;
+      if (filter !== 'all' && filter !== 'favorites') {
+        const season = filter as Season;
+        if (outfit.seasons.length > 0 && !outfit.seasons.includes(season)) return false;
+      }
+      return true;
+    });
+  }, [outfits, filter]);
+
+  const lastWorn = (outfit: Outfit) => {
+    const dates = outfit.wornDates ?? [];
+    if (dates.length === 0) return null;
+    const latest = Math.max(...dates);
+    return new Date(latest).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={typography.title}>Outfits</Text>
-        <Link href="/create-outfit" asChild>
-          <Pressable style={styles.addButton} hitSlop={8}>
-            <Ionicons name="add" size={22} color={theme.onPrimary} />
-          </Pressable>
-        </Link>
-      </View>
-
+    <Screen>
       <FlatList
-        data={outfits}
+        data={filtered}
         keyExtractor={(outfit) => outfit.id}
-        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 24 }}
+        ListHeaderComponent={
+          <View>
+            <PageHeader
+              title="My Outfits"
+              subtitle="Every look you saved, ready to wear again."
+            />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+              <Chip label="All" active={filter === 'all'} onPress={() => setFilter('all')} />
+              <Chip
+                label="♥ Favourites"
+                active={filter === 'favorites'}
+                gold
+                onPress={() => setFilter('favorites')}
+              />
+              {SEASONS.map((season) => (
+                <Chip
+                  key={season}
+                  label={season}
+                  active={filter === season}
+                  onPress={() => setFilter(filter === season ? 'all' : season)}
+                />
+              ))}
+            </View>
+          </View>
+        }
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Ionicons name="albums-outline" size={48} color={theme.border} />
-            <Text style={styles.emptyTitle}>No outfits yet</Text>
-            <Text style={styles.emptySubtitle}>
-              Combine pieces from your closet into ready-to-wear outfits.
-            </Text>
-            <Link href="/create-outfit" asChild>
-              <Pressable style={styles.emptyButton}>
-                <Text style={styles.emptyButtonText}>Create an outfit</Text>
-              </Pressable>
-            </Link>
+          <View>
+            <EmptyState
+              icon="albums-outline"
+              title="No outfits yet"
+              subtitle="Let your stylist create looks for you in the Style tab, or build one yourself."
+            />
+            <Pressable style={styles.buildButton} onPress={() => router.push('/create-outfit')}>
+              <Text style={[typography.button, { color: theme.gold }]}>Build an outfit myself</Text>
+            </Pressable>
           </View>
         }
         renderItem={({ item }) => {
-          const thumbs = item.itemIds
-            .map((id) => items.find((clothingItem) => clothingItem.id === id))
-            .filter(Boolean);
+          const worn = lastWorn(item);
           return (
-            <Pressable
-              style={styles.card}
-              onPress={() => router.push(`/outfit/${item.id}`)}
-            >
-              <Text style={styles.cardName}>{item.name}</Text>
-              {item.occasion ? (
-                <Text style={styles.cardOccasion}>{item.occasion}</Text>
-              ) : null}
-              <View style={styles.thumbs}>
-                {thumbs.length === 0 ? (
-                  <Text style={styles.cardOccasion}>
-                    {item.itemIds.length} items no longer in your closet
+            <Pressable style={styles.card} onPress={() => router.push(`/outfit/${item.id}`)}>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={[typography.heading, { flex: 1 }]} numberOfLines={1}>
+                    {item.name}
                   </Text>
-                ) : (
-                  <>
-                    {thumbs.slice(0, 4).map((clothingItem) => (
-                      <Image
-                        key={clothingItem!.id}
-                        source={{ uri: clothingItem!.uri }}
-                        style={styles.thumb}
-                      />
-                    ))}
-                    {item.itemIds.length > 4 && (
-                      <View style={[styles.thumb, styles.moreThumb]}>
-                        <Text style={styles.moreText}>
-                          +{item.itemIds.length - 4}
-                        </Text>
-                      </View>
-                    )}
-                  </>
-                )}
+                  <Pressable
+                    hitSlop={10}
+                    onPress={() => {
+                      void updateOutfit(item.id, { favorite: !item.favorite });
+                    }}
+                  >
+                    <Ionicons
+                      name={item.favorite ? 'heart' : 'heart-outline'}
+                      size={20}
+                      color={item.favorite ? theme.gold : theme.muted}
+                    />
+                  </Pressable>
+                </View>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+                  {item.itemIds.map((itemId) => {
+                    const wardrobeItem = itemById.get(itemId);
+                    return <ItemThumb key={itemId} uri={wardrobeItem?.uri} size={56} />;
+                  })}
+                </View>
+                <Text style={[typography.muted, { marginTop: 10 }]}>
+                  {[
+                    item.seasons.length > 0 ? item.seasons.join(', ') : null,
+                    item.occasion,
+                    worn ? `Last worn ${worn}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ') || 'No details yet'}
+                </Text>
               </View>
+              <Ionicons name="chevron-forward" size={18} color={theme.beige} />
             </Pressable>
           );
         }}
       />
-    </View>
+      <Pressable style={styles.fab} onPress={() => router.push('/create-outfit')}>
+        <Ionicons name="add" size={28} color="#FFFFFF" />
+      </Pressable>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.background,
-  },
-  header: {
+  card: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing,
-    paddingTop: 8,
-  },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  list: {
-    padding: theme.spacing,
-    paddingBottom: 24,
-  },
-  card: {
+    gap: 10,
     backgroundColor: theme.card,
-    borderRadius: theme.radius,
-    padding: 14,
     borderWidth: 1,
     borderColor: theme.border,
-    marginBottom: 12,
+    borderRadius: theme.radius,
+    padding: 16,
+    marginBottom: 14,
   },
-  cardName: {
-    ...typography.body,
-    fontWeight: '600',
+  buildButton: {
+    alignItems: 'center',
+    paddingVertical: 14,
   },
-  cardOccasion: {
-    ...typography.subtitle,
-    marginTop: 2,
-  },
-  thumbs: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 10,
-  },
-  thumb: {
+  fab: {
+    position: 'absolute',
+    right: theme.spacing,
+    bottom: 24,
     width: 56,
     height: 56,
-    borderRadius: 10,
-    backgroundColor: theme.chip,
-  },
-  moreThumb: {
+    borderRadius: 28,
+    backgroundColor: theme.gold,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  moreText: {
-    ...typography.subtitle,
-    fontSize: 12,
-    color: theme.text,
-    fontWeight: '600',
-  },
-  empty: {
-    alignItems: 'center',
-    paddingTop: 80,
-    paddingHorizontal: 32,
-  },
-  emptyTitle: {
-    ...typography.body,
-    fontWeight: '600',
-    marginTop: 16,
-  },
-  emptySubtitle: {
-    ...typography.subtitle,
-    textAlign: 'center',
-    marginTop: 6,
-  },
-  emptyButton: {
-    marginTop: 20,
-    backgroundColor: theme.primary,
-    borderRadius: 24,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-  },
-  emptyButtonText: {
-    ...typography.button,
-    color: theme.onPrimary,
+    shadowColor: '#000000',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
 });

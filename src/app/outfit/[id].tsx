@@ -1,149 +1,190 @@
+import { useMemo, useState } from 'react';
 import {
   Alert,
-  FlatList,
-  Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useCloset } from '../../context/ClosetContext';
+import { useLocalSearchParams, router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { Chip, Field, Input, ItemThumb, PrimaryButton, SeasonChips } from '../../components/ui';
 import { theme, typography } from '../../theme';
+import { useCloset } from '../../store/ClosetStore';
+import { Season } from '../../types';
 
 export default function OutfitDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { outfits, items, removeOutfit } = useCloset();
+  const { outfits, items, updateOutfit, removeOutfit, markOutfitWorn } = useCloset();
+  const outfit = useMemo(() => outfits.find((entry) => entry.id === id), [outfits, id]);
 
-  const outfit = outfits.find((candidate) => candidate.id === id);
+  const [name, setName] = useState(outfit?.name ?? '');
+  const [seasons, setSeasons] = useState<Season[]>(outfit?.seasons ?? []);
+  const [occasion, setOccasion] = useState<string | null>(outfit?.occasion ?? null);
+  const [notes, setNotes] = useState(outfit?.notes ?? '');
+
+  const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
 
   if (!outfit) {
-    return <View style={styles.container} />;
+    return (
+      <View style={[styles.fill, styles.center]}>
+        <Text style={typography.muted}>This outfit is no longer saved.</Text>
+      </View>
+    );
   }
 
-  const outfitItems = outfit.itemIds
-    .map((itemId) => items.find((item) => item.id === itemId))
-    .filter(Boolean);
-
-  const confirmDelete = () => {
-    Alert.alert('Delete outfit', `Remove "${outfit.name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          void removeOutfit(outfit.id).then(() => {
-            if (router.canDismiss()) {
-              router.dismiss();
-            } else {
-              router.back();
-            }
-          });
-        },
-      },
-    ]);
-  };
+  const wornDates = outfit.wornDates ?? [];
+  const lastWorn = wornDates.length
+    ? new Date(Math.max(...wornDates)).toLocaleDateString(undefined, { day: 'numeric', month: 'long' })
+    : null;
 
   return (
-    <View style={styles.container}>
-      <FlatList
-        data={outfitItems}
-        keyExtractor={(item) => item!.id}
-        numColumns={2}
-        columnWrapperStyle={styles.row}
-        contentContainerStyle={styles.grid}
-        ListHeaderComponent={
-          <View style={styles.header}>
-            <Text style={styles.name}>{outfit.name}</Text>
-            <Text style={styles.meta}>
-              {outfit.occasion
-                ? `${outfit.occasion} · ${outfitItems.length} items`
-                : `${outfitItems.length} items`}
-            </Text>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.fill}>
+      <ScrollView
+        contentContainerStyle={{ padding: theme.spacing, paddingBottom: 40 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Text style={[typography.heading, { flex: 1 }]}>{outfit.name}</Text>
+          <Pressable
+            hitSlop={10}
+            onPress={() => void updateOutfit(outfit.id, { favorite: !outfit.favorite })}
+          >
+            <Ionicons
+              name={outfit.favorite ? 'heart' : 'heart-outline'}
+              size={24}
+              color={outfit.favorite ? theme.gold : theme.muted}
+            />
+          </Pressable>
+        </View>
+        {outfit.explanation ? (
+          <Text style={[typography.muted, { marginTop: 4, lineHeight: 19 }]}>{outfit.explanation}</Text>
+        ) : null}
+        <Text style={[typography.muted, { marginTop: 6 }]}>
+          {wornDates.length > 0
+            ? `Worn ${wornDates.length} ${wornDates.length === 1 ? 'time' : 'times'}${lastWorn ? ` · last on ${lastWorn}` : ''}`
+            : 'Not worn yet'}
+        </Text>
+
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 16 }}>
+          {outfit.itemIds.map((itemId) => {
+            const item = itemById.get(itemId);
+            return (
+              <Pressable key={itemId} onPress={() => item && router.push(`/item/${item.id}`)}>
+                <ItemThumb uri={item?.uri} size={92} />
+                <Text style={styles.itemName} numberOfLines={1}>
+                  {item?.name ?? 'Removed piece'}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <View style={{ marginTop: theme.spacing }}>
+          <Field label="Name">
+            <Input value={name} onChangeText={setName} />
+          </Field>
+
+          <Field label="Seasons">
+            <SeasonChips
+              selected={seasons}
+              onToggle={(value) =>
+                setSeasons((previous) =>
+                  previous.includes(value)
+                    ? previous.filter((entry) => entry !== value)
+                    : [...previous, value],
+                )
+              }
+            />
+          </Field>
+
+          <Field label="Occasion">
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              <Chip label="Everyday" active={occasion === 'Everyday'} onPress={() => setOccasion(occasion === 'Everyday' ? null : 'Everyday')} />
+              <Chip label="Special" active={occasion === 'Special'} onPress={() => setOccasion(occasion === 'Special' ? null : 'Special')} />
+            </View>
+          </Field>
+
+          <Field label="Notes">
+            <Input value={notes} onChangeText={setNotes} multiline placeholder="Styling ideas, memories…" />
+          </Field>
+
+          <PrimaryButton
+            label="Mark as worn today"
+            tone="ink"
+            onPress={() => void markOutfitWorn(outfit.id)}
+          />
+
+          <View style={{ marginTop: 12 }}>
+            <PrimaryButton
+              label="Save changes"
+              onPress={() => {
+                void (async () => {
+                  await updateOutfit(outfit.id, {
+                    name: name.trim() || outfit.name,
+                    seasons,
+                    occasion: occasion ?? undefined,
+                    notes: notes.trim() || undefined,
+                  });
+                  router.back();
+                })();
+              }}
+            />
           </View>
-        }
-        ListEmptyComponent={
-          <Text style={styles.empty}>
-            The items in this outfit are no longer in your closet.
-          </Text>
-        }
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <Image source={{ uri: item!.uri }} style={styles.image} />
-            <Text style={styles.cardName} numberOfLines={1}>
-              {item!.name}
-            </Text>
-          </View>
-        )}
-      />
-      <Pressable style={styles.deleteButton} onPress={confirmDelete}>
-        <Text style={styles.deleteText}>Delete outfit</Text>
-      </Pressable>
-    </View>
+
+          <Pressable
+            style={styles.deleteButton}
+            onPress={() =>
+              Alert.alert('Delete this outfit?', 'Your clothing pieces will not be touched.', [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete',
+                  style: 'destructive',
+                  onPress: () => {
+                    void (async () => {
+                      await removeOutfit(outfit.id);
+                      router.back();
+                    })();
+                  },
+                },
+              ])
+            }
+          >
+            <Text style={styles.deleteText}>Delete outfit</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  fill: {
     flex: 1,
     backgroundColor: theme.background,
   },
-  header: {
-    paddingHorizontal: theme.spacing,
-    paddingTop: 8,
-    paddingBottom: 12,
-  },
-  name: {
-    ...typography.title,
-    fontSize: 24,
-  },
-  meta: {
-    ...typography.subtitle,
-    marginTop: 4,
-  },
-  grid: {
-    paddingHorizontal: theme.spacing,
-    paddingBottom: 24,
-  },
-  row: {
-    gap: 10,
-    marginBottom: 12,
-  },
-  card: {
+  center: {
     flex: 1,
-    backgroundColor: theme.card,
-    borderRadius: theme.radius,
-    padding: 8,
-    borderWidth: 1,
-    borderColor: theme.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  image: {
-    width: '100%',
-    aspectRatio: 3 / 4,
-    borderRadius: 10,
-    backgroundColor: theme.chip,
-  },
-  cardName: {
-    ...typography.body,
-    fontSize: 13,
-    fontWeight: '600',
-    marginTop: 8,
-  },
-  empty: {
-    ...typography.body,
+  itemName: {
+    fontSize: 11,
     color: theme.muted,
-    paddingVertical: 24,
+    marginTop: 4,
+    textAlign: 'center',
+    width: 92,
   },
   deleteButton: {
-    margin: theme.spacing,
     alignItems: 'center',
-    paddingVertical: 12,
-    borderRadius: theme.radius,
-    borderWidth: 1,
-    borderColor: theme.danger,
+    paddingVertical: 16,
+    marginTop: 4,
   },
   deleteText: {
-    ...typography.button,
     color: theme.danger,
+    fontSize: 14,
   },
 });
